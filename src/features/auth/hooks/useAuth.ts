@@ -3,7 +3,15 @@ import { useAuthStore } from "../store";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import type { AuthResponse, LoginRequest } from "../types";
+import { jwtDecode } from "jwt-decode";
+import type { UserRole } from "@/shared/types";
 
+interface JwtPayload {
+  sub: string;
+  email: string;
+  role: UserRole;
+}
 export const useRegisterMutation = () => {
   const navigate = useNavigate();
   return useMutation({
@@ -36,15 +44,20 @@ export const useLoginMutation = () => {
   const location = useLocation();
   const from = location.state?.from?.pathname || "/profile";
   const setAuth = useAuthStore((state) => state.setAuth);
-  return useMutation({
-    mutationFn: (userData: { email: string; password: string }) =>
-      authService.login(userData),
+  return useMutation<AuthResponse, Error, LoginRequest>({
+    mutationFn: (data) => authService.login(data),
 
-    onSuccess: (tokens: { accessToken: string; refreshToken: string }) => {
-      toast.success("Login thành công");
+    onSuccess: (res) => {
+      const decoded = jwtDecode<JwtPayload>(res.accessToken);
       // Mặc định role null hoặc có thể decode từ JWT
-      setAuth({ accessToken: tokens.accessToken, role: null });
-      navigate(from, { replace: true }); // cho phép quay về trang trước đó
+      setAuth({ accessToken: res.accessToken, role: decoded.role });
+      toast.success("Login thành công");
+
+      if (decoded.role === "ADMIN") {
+        navigate("/admin/rituals", { replace: true }); // cho phép quay về trang trước đó
+      } else {
+        navigate(from, { replace: true }); // cho phép quay về trang trước đó
+      }
     },
 
     onError: (err: any) => {

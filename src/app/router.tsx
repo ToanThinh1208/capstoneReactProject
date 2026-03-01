@@ -2,29 +2,33 @@ import { createBrowserRouter } from "react-router-dom";
 import App from "./App";
 import LoginPage from "../features/auth/pages/LoginPage";
 import RegisterPage from "../features/auth/pages/RegisterPage";
-
+import UserLayout from "@/shared/layouts/UserLayout";
+import RitualsCatalog from "../features/ritualts/pages/RitualsCatalog";
+import RitualDetail from "../features/ritualts/pages/RitualDetail";
+import HomePage from "@/features/landing/pages/HomePage";
 const router = createBrowserRouter([
   {
-    path: "/",
-    element: <App />,
+    element: <UserLayout />,
     children: [
       {
         index: true,
-        // element: <HomePage />, // To-do: Create HomePage component
+        element: <HomePage />,
       },
-
       {
-        // element: <GuestGuard />, // To-do: Create GuestGuard component
-        children: [
-          {
-            path: "login",
-            element: <LoginPage />,
-          },
-          {
-            path: "register",
-            element: <RegisterPage />,
-          },
-        ],
+        path: "rituals",
+        element: <RitualsCatalog />,
+      },
+      {
+        path: "rituals/:id",
+        element: <RitualDetail />,
+      },
+      {
+        path: "login",
+        element: (
+          <GuestRoute>
+            <LoginPage />
+          </GuestRoute>
+        ),
       },
     ],
   },

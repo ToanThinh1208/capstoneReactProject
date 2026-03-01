@@ -76,7 +76,7 @@ apiClient.interceptors.response.use(
           },
         );
         const newToken: string =
-          response.data?.data?.accessToken ?? response.data?.data?.refreshToken;
+          response.data?.data?.accessToken ?? response.data?.data?.accessToken;
         // lưu accesstoken mới vào zustand store
         useAuthStore.getState().setAuth({
           accessToken: newToken,
@@ -87,17 +87,24 @@ apiClient.interceptors.response.use(
         // Thực hiện lại request ban đầu với accessToken mới
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return apiClient(originalRequest);
-      } catch (error) {
-        processQueue(null);
+      } catch (refreshError: any) {
+        processQueue(refreshError);
         // Nếu refresh token cũng lỗi, logout user
         useAuthStore.getState().clearAuth();
         toast.error("Session expired. Please login again.");
         window.location.href = "/login"; // redirect cứng to login
-        return Promise.reject(error);
+        return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }
     }
+    const message =
+      error.response?.data?.message ?? error.message ?? "Đã có lỗi xảy ra";
+    const isLogoutEndpoint = originalRequest.url?.includes("/auth/logout");
+    if (!isLogoutEndpoint) {
+      toast.error(message);
+    }
+    return Promise.reject(error);
   },
 );
 
