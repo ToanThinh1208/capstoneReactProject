@@ -1,0 +1,56 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import ritualsApi, { type RitualResponse } from "@/features/ritualts/services";
+import { toast } from "sonner";
+
+export const useRituals = () => {
+  return useQuery<RitualResponse>({
+    queryKey: ["rituals"],
+    // Key = Id của cache
+    // cùng key = chung cache
+    //khác key = khác cache
+
+    //ví dụ
+    // queryKey: ["me"] => cache1
+    // queryKey: ["me", 1] => cache2
+    // queryKey: ["me", 2] => cache3
+
+    //Key là array vì:
+    //1. Dễ nest: ["posts", {userId: 1}, "comments"]
+    //2. Dễ query so sánh array theo giá trị
+    //3. Dễ invalidate  theo pattern
+
+    queryFn: ritualsApi.getRituals,
+    // Query Function concept:
+    //Hàm async trả về data
+    // Chỉ chạy khi cần fetch (initial, refetch, stale)
+
+    //ví dụ
+    //queryFn: () => fetch("https://api.example.com/me").then(res => res.json())
+
+    // Conditional fetching: enabled: false > Query không chạy enabled: true > Query chạy
+
+    //select Option: Transform data trước khi return về component
+    // Lợi ích:
+    // Component chỉ re-render khi data thay đổi
+    // Tách logic transform data ra khỏi component
+
+    //refetchInterval: 10000, // 10s
+    // Tự động refetch sau mỗi 10s
+    //
+  });
+};
+
+// export const useDeleteRitualMutaion = () => {
+//   const queryClient = useQueryClient();
+//   return useMutation({
+//     mutationFn: (id: string) => ritualsApi.deleteRitual(id),
+//     onSuccess: () => {
+//       //dùng để cho data này thành bị cũ
+//       queryClient.invalidateQueries({ queryKey: ["rituals"] });
+//       toast.success("Xóa thành công");
+//     },
+//     onError: (err: any) => {
+//       toast.error(err.response?.data?.message || "Xóa thất bại");
+//     },
+//   });
+// };

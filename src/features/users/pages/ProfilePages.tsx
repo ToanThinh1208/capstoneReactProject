@@ -19,7 +19,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
-} from "@/shared/components/common/StatusState";
+} from "@/shared/components/ui/StatusState";
 
 const ProfilePage: React.FC = () => {
   const {

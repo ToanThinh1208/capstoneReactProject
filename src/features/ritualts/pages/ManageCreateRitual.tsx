@@ -1,9 +1,5 @@
-import React from 'react'
-
 function ManageCreateRitual() {
-  return (
-    <div>ManageCreateRitual</div>
-  )
+  return <div>ManageCreateRitual</div>;
 }
 
-export default ManageCreateRitual
+export default ManageCreateRitual;
