@@ -8,7 +8,7 @@ function App() {
     <>
       <QueryProvider>
         <RouterProvider />
-        <Toaster position="top-right" richColors closeButton />
+        <Toaster position="bottom-right" richColors closeButton />
       </QueryProvider>
     </>
   );

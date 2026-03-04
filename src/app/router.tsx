@@ -7,7 +7,7 @@ import RitualDetail from "../features/ritualts/pages/RitualDetail";
 import HomePage from "@/features/landing/pages/HomePage";
 import GuestRoute from "@/shared/components/common/GuestRoute";
 import UnauthorizedPage from "@/shared/pages/UnauthorizedPage";
-import ProfilePage from "@/shared/pages/ProfilePages";
+import ProfilePage from "@/features/users/pages/ProfilePages";
 import ProtectedRoute from "@/shared/components/common/ProtectedRoute";
 import NotFoundPage from "@/shared/pages/NotFoundPage";
 import AdminLayout from "@/shared/layouts/AdminLayout";
