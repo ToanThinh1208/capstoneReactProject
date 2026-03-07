@@ -13,8 +13,8 @@ import {
   ErrorState,
   LoadingState,
 } from "@/shared/components/ui/StatusState";
-import { useRituals } from "@/features/ritualts/hooks/useRituals";
-import type { Ritual } from "@/features/ritualts/services";
+import { useRituals } from "@/features/rituals/hooks/useRituals";
+import type { Ritual } from "@/features/rituals/services";
 
 const RitualCataLog = () => {
   const {
