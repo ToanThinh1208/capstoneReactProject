@@ -1,182 +1,242 @@
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/shared/components/ui/card";
-import { Badge } from "@/shared/components/ui/badge";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Search, Filter, X } from "lucide-react";
+
+import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
-import { Loader2, Flame } from "lucide-react";
+import { Badge } from "@/shared/components/ui/badge";
+import { useDebounce } from "@/shared/hooks/useDebounce";
 import {
+  LoadingSpinner,
   EmptyState,
-  ErrorState,
-  LoadingState,
-} from "@/shared/components/ui/StatusState";
-import { useRituals } from "@/features/rituals/hooks/useRituals";
-import type { Ritual } from "@/features/rituals/services";
+  Pagination,
+} from "../../../shared/components/common";
+import { DIFFICULTY_LEVELS } from "../../../shared/constants";
+import { useRituals, useRitualCategories } from "../hooks/useRituals";
+import { RitualCard } from "../components/RitualCard";
 
-const RitualCataLog = () => {
-  const {
-    data: rituals,
-    isLoading,
-    isError,
-    error,
-    refetch,
-    isFetching,
-  } = useRituals();
+/**
+ * Trang danh sách nghi lễ cho User – có search, filter, pagination.
+ * Tất cả state lưu trên URL (searchParams) → có thể bookmark/share.
+ */
+export function RitualCatalog() {
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Extract rituals list from the response structure
-  // console.log("RitualCataLogresponse:", response);
+  // Data hooks
+  const { rituals, pagination, isLoading } = useRituals();
+  const { data: categories } = useRitualCategories();
 
-  // Robustly find the array
-  // let ritualsData: Ritual[] = [];
-  // if (response) {
-  //   if (Array.isArray(response)) {
-  //     ritualsData = response;
-  //   } else if (Array.isArray(response.data)) {
-  //     // If response.data is the array directly
-  //     ritualsData = response.data;
-  //   } else if (response.data && Array.isArray(response.data.data)) {
-  //     // If response.data is an object containing the array (common in key-value responses)
-  //     ritualsData = response.data.data;
-  //   }
-  // }
-  // const rituals = response?.data;
-  // const rituals = ritualsData;
+  /**
+   * Local search state + Debounce pattern:
+   *
+   * FLOW:
+   * 1. User gõ chữ → `searchInput` update ngay lập tức (controlled input)
+   * 2. `useDebounce` chờ 500ms sau lần gõ cuối → tạo `debouncedSearch`
+   * 3. `useEffect` bắt thay đổi của `debouncedSearch` → update URL
+   * 4. URL update → trigger `useRituals()` hook → gọi API
+   *
+   * TẠI SAO CẦN LOCAL STATE?
+   * - Không update URL trực tiếp khi user gõ (gây flicker URL bar)
+   * - Chờ user gõ xong mới update URL → giảm số lần gọi API
+   *
+   * VÍ DỤ: User gõ "cúng rằm" (9 ký tự)
+   * - Không debounce: 9 lần gọi API ❌
+   * - Có debounce: 1 lần gọi API (sau 500ms) ✅
+   */
+  const [searchInput, setSearchInput] = useState(
+    searchParams.get("search") || "",
+  );
+  const debouncedSearch = useDebounce(searchInput, 500);
 
-  if (isLoading) {
-    return <LoadingState />;
-  }
+  /**
+   * Sync debounced search → URL params.
+   *
+   * Chỉ chạy khi `debouncedSearch` thay đổi (500ms sau khi user ngừng gõ).
+   *
+   * eslint-disable: Bỏ qua warning thiếu deps (searchParams, setSearchParams).
+   * Lý do: Thêm vào deps → vòng lặp vô hạn:
+   *   debouncedSearch → update URL → searchParams change → useEffect chạy lại → loop ♾️
+   */
+  useEffect(() => {
+    if (debouncedSearch !== searchParams.get("search")) {
+      const params = new URLSearchParams(searchParams);
+      if (debouncedSearch) {
+        params.set("search", debouncedSearch);
+      } else {
+        params.delete("search");
+      }
+      params.set("page", "1"); // Reset về trang 1 khi search mới
+      setSearchParams(params);
+    }
+  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (isError) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <ErrorState
-          message={error?.message || "Failed to load rituals"}
-          onRetry={() => refetch()}
-        />
-      </div>
-    );
-  }
+  /**
+   * Filter handlers - Update URL params cho các filter khác (không search).
+   *
+   * PATTERN CHUNG:
+   * - Tạo URLSearchParams mới từ params hiện tại (giữ nguyên các params khác)
+   * - Set/delete param tương ứng
+   * - Reset về page 1 (filter mới → xem từ đầu)
+   * - setSearchParams → trigger re-render + API call
+   *
+   * TẠI SAO LƯU TRÊN URL?
+   * ✅ Bookmark được: Copy link → bạn bè mở đúng filters
+   * ✅ Back/Forward browser: Quay lại filters trước đó
+   * ✅ Share được: Gửi link có sẵn bộ lọc
+   * ✅ Refresh page: Giữ nguyên filters (không mất state)
+   */
+  const handleFilterChange = (key: string, value: string | undefined) => {
+    const params = new URLSearchParams(searchParams);
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    params.set("page", "1");
+    setSearchParams(params);
+  };
 
-  if (!rituals) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
-        <EmptyState message="No rituals found" />
-        <Button onClick={() => refetch()} variant="outline">
-          Refresh
-        </Button>
-      </div>
-    );
-  }
+  /**
+   * Clear all filters - Reset về trạng thái ban đầu.
+   * - Xoá toàn bộ URL params
+   * - Reset local search input về rỗng
+   * - useEffect sẽ tự động sync → gọi API không filter
+   */
+  const clearFilters = () => {
+    const params = new URLSearchParams();
+    setSearchParams(params);
+    setSearchInput("");
+  };
+
+  /**
+   * Pagination handler - Chỉ update param "page", giữ nguyên filters.
+   * Không reset về page 1 (vì user đang chủ động chuyển trang).
+   */
+  const handlePageChange = (page: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", String(page));
+    setSearchParams(params);
+  };
+
+  /**
+   * Check có filter nào đang active không?
+   * Dùng để hiển thị nút "Xoá bộ lọc" (conditional rendering).
+   * !! (double negation) convert string | null → boolean.
+   */
+  const hasActiveFilters =
+    !!searchParams.get("difficultyLevel") ||
+    !!searchParams.get("ritualCategoryId") ||
+    !!searchParams.get("search");
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Rituals</h1>
-          <p className="text-muted-foreground mt-1">
-            Explore traditional rituals and ceremonies
-          </p>
+    <div className="container mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Nghi lễ truyền thống</h1>
+        <p className="mt-1 text-muted-foreground">
+          Khám phá và tìm hiểu các nghi lễ cúng kiếng Việt Nam
+        </p>
+      </div>
+
+      {/* Search & Filters */}
+      <div className="mb-6 space-y-4">
+        {/* Search bar */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Tìm kiếm nghi lễ..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="pl-10"
+          />
         </div>
-        <Button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          variant="outline"
-          size="sm"
-          className="w-fit"
-        >
-          {isFetching ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : null}
-          {isFetching ? "Refreshing..." : "Refresh Data"}
-        </Button>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {rituals.map((ritual: Ritual, index: number) => (
-          // do đây là lỗi ts do ts ko chắc chắn có ritual có là mảng hay không -> conflic
-          <Card
-            key={ritual.id}
-            className="flex flex-col h-full hover:shadow-lg transition-shadow duration-200"
+        {/* Filter row */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Filter className="h-4 w-4" />
+            Lọc:
+          </div>
+
+          {/* Độ khó */}
+          <select
+            value={searchParams.get("difficultyLevel") || ""}
+            onChange={(e) =>
+              handleFilterChange("difficultyLevel", e.target.value || undefined)
+            }
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {ritual.ritualMedias && ritual.ritualMedias.length > 0 && (
-              <div className="relative w-full pt-[56.25%] overflow-hidden rounded-t-lg bg-gray-100">
-                <img
-                  src={ritual.ritualMedias[0].url}
-                  alt={ritual.name}
-                  className="absolute top-0 left-0 w-full h-full object-cover"
-                  loading="lazy"
-                />
-              </div>
-            )}
+            <option value="">Tất cả độ khó</option>
+            {DIFFICULTY_LEVELS.map((level) => (
+              <option key={level.value} value={level.value}>
+                {level.label}
+              </option>
+            ))}
+          </select>
 
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="space-y-1 w-full">
-                  <div className="flex justify-between items-center w-full">
-                    <Badge variant="outline" className="text-xs">
-                      #{index + 1}
-                    </Badge>
-                    <div className="flex gap-2">
-                      {ritual.isHot && (
-                        <Badge
-                          variant="destructive"
-                          className="flex items-center gap-1"
-                        >
-                          <Flame className="w-3 h-3" /> Hot
-                        </Badge>
-                      )}
-                      <Badge variant="secondary" className="capitalize">
-                        {ritual.difficultyLevel}
-                      </Badge>
-                    </div>
-                  </div>
-                  <CardTitle className="line-clamp-2 text-xl mt-2">
-                    {ritual.name}
-                  </CardTitle>
-                </div>
-              </div>
-            </CardHeader>
+          {/* Danh mục */}
+          <select
+            value={searchParams.get("ritualCategoryId") || ""}
+            onChange={(e) =>
+              handleFilterChange(
+                "ritualCategoryId",
+                e.target.value || undefined,
+              )
+            }
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="">Tất cả danh mục</option>
+            {categories?.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
 
-            <CardContent className="flex-1 pb-3 space-y-4">
-              <div>
-                <h4 className="text-sm font-semibold mb-1">Description</h4>
-                <p className="text-muted-foreground text-sm line-clamp-3">
-                  {ritual.description}
-                </p>
-              </div>
+          {/* Clear filters */}
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              <X className="mr-1 h-3 w-3" />
+              Xoá bộ lọc
+            </Button>
+          )}
 
-              <div>
-                <h4 className="text-sm font-semibold mb-1">Content</h4>
-                <p className="text-muted-foreground text-sm line-clamp-4 text-justify">
-                  {ritual.content}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                <div>
-                  <span className="font-semibold">Category ID:</span>{" "}
-                  <span className="font-mono">{ritual.ritualCategoryId}</span>
-                </div>
-                <div>
-                  <span className="font-semibold">Reference:</span>{" "}
-                  {ritual.reference || "N/A"}
-                </div>
-              </div>
-            </CardContent>
-
-            <CardFooter className="pt-0">
-              <Button className="w-full mt-2" variant="default">
-                View Details
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
+          {/* Result count */}
+          {pagination && (
+            <Badge variant="secondary" className="ml-auto">
+              {pagination.totalItems} kết quả
+            </Badge>
+          )}
+        </div>
       </div>
+
+      {/* Results */}
+      {isLoading ? (
+        <LoadingSpinner className="py-20" size="lg" />
+      ) : !rituals?.length ? (
+        <EmptyState
+          title="Không tìm thấy nghi lễ"
+          description="Thử thay đổi từ khoá tìm kiếm hoặc bộ lọc."
+        />
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {rituals.map((ritual) => (
+              <RitualCard key={ritual.id} ritual={ritual} />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {pagination && (
+            <Pagination
+              meta={pagination}
+              onPageChange={handlePageChange}
+              className="mt-8"
+            />
+          )}
+        </>
+      )}
     </div>
   );
-};
-
-export default RitualCataLog;
+}

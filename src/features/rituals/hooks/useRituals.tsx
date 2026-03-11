@@ -23,9 +23,13 @@ export function useRituals() {
 
   // Parse filters từ URL params
   const filters = useMemo<RitualFilterParams>(() => {
+    // useMemo dùng để lưu giá trị khi search/ tính toán để tránh re-render
+    //chỉ tính toán lại khi dependency thay đổi
+    //useCallback dùng để lưu function khi search/ tính toán để tránh re-render
     return {
       page: Number(searchParams.get("page")) || 1,
       limit: Number(searchParams.get("limit")) || 10,
+      //set rỗng sẽ gọi API
       search: searchParams.get("search") || undefined,
       difficultyLevel: searchParams.get("difficultyLevel") || undefined,
       ritualCategoryId: searchParams.get("ritualCategoryId") || undefined,
